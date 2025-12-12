@@ -1,8 +1,9 @@
 import { io, Socket } from "socket.io-client";
 import { LeaderboardEntry, User } from "../types";
+import { BACKEND_URL } from "../config";
 
-// Backend server URL - runs on port 3001 (separate from frontend)
-const SERVER_URL = "http://localhost:3001";
+// Backend server URL - configurable via environment variable
+const SERVER_URL = BACKEND_URL;
 
 // API base URL for REST endpoints
 const API_URL = `${SERVER_URL}/api`;
