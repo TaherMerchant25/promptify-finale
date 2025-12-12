@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { User, GameState, RoundResult, LeaderboardEntry } from './types';
 import { ROUNDS } from './constants';
 import { GeminiService } from './services/geminiService';
-import { socketService } from './services/socketService';
 import Auth from './components/Auth';
 import GameRound from './components/GameRound';
 import LandingPage from './components/LandingPage';
-import { Trophy, LogOut, LayoutGrid, Activity, Wifi } from 'lucide-react';
+import { Trophy, LogOut, LayoutGrid } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -24,10 +23,6 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('gameState');
     return saved ? JSON.parse(saved) : initialGameState;
   });
-  
-  // Leaderboard is now driven by socket
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
 
   // Restore user and service from sessionStorage
   useEffect(() => {
@@ -39,12 +34,6 @@ const App: React.FC = () => {
       setUser(parsedUser);
       setGeminiService(new GeminiService(savedApiKey));
       setView('dashboard');
-      
-      // Reconnect to socket
-      socketService.connect(parsedUser, (data) => {
-        setLeaderboard(data);
-        setIsConnected(true);
-      });
     }
   }, []);
 
@@ -60,20 +49,11 @@ const App: React.FC = () => {
     
     // Save user and API key to sessionStorage for page refresh recovery
     sessionStorage.setItem('user', JSON.stringify(user));
-    // Note: Store just a flag or handle API key more securely in production
     sessionStorage.setItem('apiKey', (service as any).apiKey || '');
-    
-    // Connect to Socket Server
-    socketService.connect(user, (data) => {
-        setLeaderboard(data);
-        setIsConnected(true);
-    });
   };
 
   const startRound = () => {
     setView('game');
-    // Notify server
-    socketService.updateProgress(gameState.totalScore, `Round ${gameState.currentRoundId}`);
   };
 
   const handleRoundComplete = (result: RoundResult) => {
@@ -90,16 +70,11 @@ const App: React.FC = () => {
       results: { ...prev.results, [result.roundId]: result }
     }));
 
-    // Notify server of new score
-    const status = isFinished ? "Finished" : "Thinking...";
-    socketService.updateProgress(newTotal, status);
-
     setView('dashboard');
   };
 
   const handleSignOut = () => {
-    // Clear socket, auth, and stored state so the login screen shows again
-    socketService.disconnect();
+    // Clear auth and stored state so the login screen shows again
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('apiKey');
     localStorage.removeItem('gameState');
@@ -107,7 +82,7 @@ const App: React.FC = () => {
     setGeminiService(null);
     setGameState(initialGameState);
     setView('landing');
-    // Hard reload to guarantee a clean slate (covers any cached/react state)
+    // Hard reload to guarantee a clean slate
     window.location.reload();
   };
 
@@ -153,15 +128,8 @@ const App: React.FC = () => {
                 <img src={user.avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-white/[0.1]" />
                 <div>
                     <div className="font-bold text-white text-lg">{user.username}</div>
-                    <div className="flex gap-2">
-                         <div className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 inline-block mt-1">
-                            SCORE: {gameState.totalScore}
-                        </div>
-                        {isConnected && (
-                             <div className="text-xs font-mono text-green-400 bg-green-950/30 px-2 py-0.5 rounded border border-green-900/50 inline-block mt-1 flex items-center gap-1">
-                                <Wifi size={10} /> LIVE
-                            </div>
-                        )}
+                    <div className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 inline-block mt-1">
+                        SCORE: {gameState.totalScore}
                     </div>
                 </div>
             </div>
@@ -236,87 +204,43 @@ const App: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Leaderboard */}
+                    {/* Score Summary */}
                     <div>
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-yellow-500/10 rounded-lg">
-                                    <Trophy className="text-yellow-500" size={24} />
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-yellow-500/10 rounded-lg">
+                                <Trophy className="text-yellow-500" size={24} />
+                            </div>
+                            <h3 className="text-2xl font-bold text-white">Your Progress</h3>
+                        </div>
+                        
+                        <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl p-8">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="bg-white/[0.03] rounded-xl p-6 border border-white/[0.08] text-center">
+                                    <div className="text-4xl font-bold text-white mb-2">{gameState.totalScore}</div>
+                                    <div className="text-sm text-white/40 uppercase tracking-wide">Total Score</div>
                                 </div>
-                                <h3 className="text-2xl font-bold text-white">Global Leaderboard</h3>
+                                <div className="bg-white/[0.03] rounded-xl p-6 border border-white/[0.08] text-center">
+                                    <div className="text-4xl font-bold text-indigo-400 mb-2">{gameState.completedRounds.length}/{ROUNDS.length}</div>
+                                    <div className="text-sm text-white/40 uppercase tracking-wide">Rounds Completed</div>
+                                </div>
+                                <div className="bg-white/[0.03] rounded-xl p-6 border border-white/[0.08] text-center">
+                                    <div className="text-4xl font-bold text-green-400 mb-2">
+                                        {gameState.completedRounds.length > 0 
+                                            ? Math.round(gameState.totalScore / gameState.completedRounds.length) 
+                                            : 0}
+                                    </div>
+                                    <div className="text-sm text-white/40 uppercase tracking-wide">Avg Score/Round</div>
+                                </div>
                             </div>
                             
-                            {isConnected ? (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-900/30 border border-green-500/30 rounded-full">
-                                    <span className="relative flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                                    </span>
-                                    <span className="text-xs font-bold text-green-400 uppercase tracking-wide">Socket Connected</span>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-900/30 border border-red-500/30 rounded-full">
-                                    <span className="relative flex h-2.5 w-2.5">
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                                    </span>
-                                    <span className="text-xs font-bold text-red-400 uppercase tracking-wide">Offline</span>
+                            {isGameComplete && (
+                                <div className="mt-8 text-center p-6 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl border border-yellow-500/20">
+                                    <Trophy className="mx-auto text-yellow-500 mb-3" size={48} />
+                                    <h4 className="text-xl font-bold text-white mb-2">🎉 Challenge Complete!</h4>
+                                    <p className="text-white/60">You've conquered all rounds with a total score of <span className="text-yellow-400 font-bold">{gameState.totalScore}</span></p>
                                 </div>
                             )}
                         </div>
-                        
-                        {!isConnected && leaderboard.length === 0 ? (
-                            <div className="p-12 text-center bg-white/[0.02] rounded-2xl border border-white/[0.08] border-dashed">
-                                <Activity className="mx-auto text-white/30 mb-3" size={32} />
-                                <p className="text-white/40">Connecting to leaderboard server...</p>
-                                <p className="text-white/20 text-xs mt-2">Make sure <code>node server.js</code> is running.</p>
-                            </div>
-                        ) : (
-                            <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl">
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="bg-black/30 text-white/40 text-xs uppercase font-bold tracking-wider">
-                                        <tr>
-                                            <th className="p-5 w-20 text-center">Rank</th>
-                                            <th className="p-5">Player</th>
-                                            <th className="p-5">Status</th>
-                                            <th className="p-5 text-right">Score</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/[0.05]">
-                                        {leaderboard.map((entry) => (
-                                            <tr key={entry.username} className={`group hover:bg-white/[0.03] transition-colors ${entry.username === user.username ? 'bg-indigo-500/5' : ''}`}>
-                                                <td className="p-5 text-center font-mono text-white/40 group-hover:text-white font-medium">
-                                                    #{entry.rank}
-                                                </td>
-                                                <td className="p-5">
-                                                    <div className="flex items-center gap-4">
-                                                        <img src={entry.avatarUrl} alt="" className="w-10 h-10 rounded-full bg-white/[0.05] shadow-md border border-white/[0.1]" />
-                                                        <div className="flex flex-col">
-                                                            <span className={`font-semibold ${entry.username === user.username ? 'text-indigo-400' : 'text-white/80'}`}>
-                                                                {entry.username} {entry.username === user.username && '(You)'}
-                                                            </span>
-                                                            {entry.isBot && <span className="text-[10px] text-white/30 font-mono uppercase">Bot</span>}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="p-5">
-                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border ${
-                                                        entry.status === 'Finished' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                        entry.status.includes('Round') ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                                                        'bg-white/[0.03] text-white/40 border-white/[0.08]'
-                                                    }`}>
-                                                        {entry.status === 'Thinking...' && <Activity size={10} className="animate-pulse" />}
-                                                        {entry.status}
-                                                    </span>
-                                                </td>
-                                                <td className="p-5 text-right font-mono font-bold text-white/90 text-lg">
-                                                    {entry.score}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
                     </div>
 
                 </div>
