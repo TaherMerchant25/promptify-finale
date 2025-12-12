@@ -3,10 +3,28 @@ import { RoundData, LeaderboardEntry } from './types';
 export const ROUNDS: RoundData[] = [
   {
     id: 1,
-    title: "The Polite Robot",
-    description: "Reverse engineer the prompt to get this exact polite refusal.",
+    title: "Phrase Master",
+    description: "Make the AI output these exact phrases. You can use any words EXCEPT the exact target sentence itself!",
     type: 'text',
-    targetContent: "I apologize, but I cannot fulfill that request as it goes against my safety guidelines. Is there anything else I can help you with today?",
+    targetContent: "", // Not used for sub-round based challenges
+    subRounds: [
+      {
+        id: "1a",
+        targetPhrase: "The cage is out of the lion"
+      },
+      {
+        id: "1b", 
+        targetPhrase: "Don't use the exact words"
+      },
+      {
+        id: "1c",
+        targetPhrase: "That's what she said"
+      },
+      {
+        id: "1d",
+        targetPhrase: "Life is unfair"
+      }
+    ]
   },
   {
     id: 2,
@@ -32,9 +50,7 @@ export const ROUNDS: RoundData[] = [
     title: "Cyberpunk City",
     description: "Generate a futuristic cyberpunk city street at night with neon blue and pink lights, rain on pavement, and no people.",
     type: 'image',
-    targetContent: "https://picsum.photos/id/203/512/512", // Using a placeholder bike/blur image for 'vibe' as a proxy, in real app would use specific generated asset
-    // Since we rely on semantic similarity, we will compare against a provided description or reference image.
-    // Let's use a specific reference for visual consistency.
+    targetContent: "https://picsum.photos/id/203/512/512",
   }
 ];
 

@@ -169,4 +169,51 @@ export class GeminiService {
     const json = JSON.parse(resp.text || "{}");
     return { score: json.score || 0, reasoning: json.reasoning || "Failed to judge." };
   }
+
+  /** PHRASE SIMILARITY - For sub-round challenges */
+  async calculatePhraseSimilarity(
+    targetPhrase: string,
+    generated: string
+  ): Promise<{ score: number; reasoning: string }> {
+    const judgeSchema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        score: { type: Type.NUMBER },
+        reasoning: { type: Type.STRING },
+      },
+      required: ["score", "reasoning"],
+    };
+
+    const prompt = `
+      You are judging a prompt engineering challenge.
+      
+      The player needed to make an AI output this EXACT TARGET PHRASE:
+      "${targetPhrase}"
+      
+      The AI actually generated this output:
+      """${generated}"""
+      
+      Score from 0-100 based on these criteria:
+      - 100: The exact phrase appears verbatim in the output
+      - 80-99: The phrase appears with very minor variations (punctuation, capitalization)
+      - 50-79: The meaning is conveyed but wording is different
+      - 20-49: Partially related content
+      - 0-19: Completely unrelated
+      
+      Look specifically for the phrase "${targetPhrase}" in the generated output.
+      Be strict but fair. The goal is to find this exact phrase or very close variations.
+    `;
+
+    const resp = await this.ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: judgeSchema,
+      },
+    });
+
+    const json = JSON.parse(resp.text || "{}");
+    return { score: json.score || 0, reasoning: json.reasoning || "Failed to judge." };
+  }
 }

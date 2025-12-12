@@ -9,13 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.33.0",
+    "@radix-ui/react-slot": "^1.2.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.23.26",
+    "lucide-react": "^0.560.0",
+    "motion": "^12.23.26",
     "react": "^19.2.2",
     "react-dom": "^19.2.2",
-    "@google/genai": "^1.33.0",
-    "lucide-react": "^0.560.0",
     "socket.io-client": "4.7.5",
-    "http": "^0.0.1-security",
-    "socket.io": "^4.8.1"
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

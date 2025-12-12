@@ -6,6 +6,11 @@ export interface User {
 
 export type RoundType = 'text' | 'image';
 
+export interface SubRound {
+  id: string;
+  targetPhrase: string;
+}
+
 export interface RoundData {
   id: number;
   title: string;
@@ -13,6 +18,16 @@ export interface RoundData {
   type: RoundType;
   targetContent: string; // Text string or Image URL
   displayTarget?: string; // Optional nice display version (if target is raw data)
+  subRounds?: SubRound[]; // Optional sub-rounds for multi-part challenges
+}
+
+export interface SubRoundResult {
+  subRoundId: string;
+  userPrompt: string;
+  generatedContent: string;
+  score: number;
+  flagged: boolean;
+  flagReason?: string;
 }
 
 export interface RoundResult {
@@ -21,6 +36,7 @@ export interface RoundResult {
   generatedContent: string;
   score: number;
   reasoning: string;
+  subRoundResults?: SubRoundResult[]; // Results for each sub-round
 }
 
 export interface GameState {

@@ -5,12 +5,13 @@ import { GeminiService } from './services/geminiService';
 import { socketService } from './services/socketService';
 import Auth from './components/Auth';
 import GameRound from './components/GameRound';
+import LandingPage from './components/LandingPage';
 import { Trophy, LogOut, LayoutGrid, Activity, Wifi } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [geminiService, setGeminiService] = useState<GeminiService | null>(null);
-  const [view, setView] = useState<'dashboard' | 'game'>('dashboard');
+  const [view, setView] = useState<'landing' | 'auth' | 'dashboard' | 'game'>('landing');
   
   const initialGameState: GameState = {
     currentRoundId: 1,
@@ -37,6 +38,7 @@ const App: React.FC = () => {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
       setGeminiService(new GeminiService(savedApiKey));
+      setView('dashboard');
       
       // Reconnect to socket
       socketService.connect(parsedUser, (data) => {
@@ -104,29 +106,40 @@ const App: React.FC = () => {
     setUser(null);
     setGeminiService(null);
     setGameState(initialGameState);
-    setView('dashboard');
+    setView('landing');
     // Hard reload to guarantee a clean slate (covers any cached/react state)
     window.location.reload();
   };
 
+  // Landing Page
+  if (view === 'landing' && !user) {
+    return <LandingPage onGetStarted={() => setView('auth')} />;
+  }
+
   // Auth Guard
-  if (!user || !geminiService) {
-    return <Auth onLogin={handleLogin} />;
+  if ((!user || !geminiService) && view === 'auth') {
+    return <Auth onLogin={handleLogin} onBack={() => setView('landing')} />;
+  }
+
+  // If somehow in auth view but user exists, redirect to dashboard
+  if (user && geminiService && (view === 'landing' || view === 'auth')) {
+    setView('dashboard');
+    return null;
   }
 
   const currentRoundData = ROUNDS.find(r => r.id === gameState.currentRoundId);
   const isGameComplete = gameState.completedRounds.length === ROUNDS.length;
 
   return (
-    <div className="min-h-screen text-slate-200 flex flex-col md:flex-row font-sans">
+    <div className="min-h-screen bg-[#030303] text-slate-200 flex flex-col md:flex-row font-sans">
       
       {/* Sidebar / Mobile Header */}
-      <div className="w-full md:w-80 bg-slate-900/40 backdrop-blur-md border-r border-slate-800 flex flex-col">
-        <div className="p-8 border-b border-slate-800/50 flex items-center gap-4">
+      <div className="w-full md:w-80 bg-black/40 backdrop-blur-md border-r border-white/[0.08] flex flex-col">
+        <div className="p-8 border-b border-white/[0.05] flex items-center gap-4">
            <img 
              src="https://avatars.githubusercontent.com/u/53648600?s=200&v=4" 
              alt="ACM DTU" 
-             className="w-12 h-12 rounded-xl shadow-lg shadow-blue-500/20" 
+             className="w-12 h-12 rounded-xl shadow-lg shadow-indigo-500/20" 
            />
            <div>
              <h1 className="font-bold text-xl text-white tracking-tight">Promptify</h1>
@@ -136,12 +149,12 @@ const App: React.FC = () => {
 
         {/* User Stats */}
         <div className="p-6">
-            <div className="flex items-center gap-4 mb-8 bg-slate-800/30 p-4 rounded-2xl border border-slate-700/30">
-                <img src={user.avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-slate-700" />
+            <div className="flex items-center gap-4 mb-8 bg-white/[0.03] p-4 rounded-2xl border border-white/[0.08]">
+                <img src={user.avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-white/[0.1]" />
                 <div>
                     <div className="font-bold text-white text-lg">{user.username}</div>
                     <div className="flex gap-2">
-                         <div className="text-xs font-mono text-blue-400 bg-blue-950/30 px-2 py-0.5 rounded border border-blue-900/50 inline-block mt-1">
+                         <div className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 inline-block mt-1">
                             SCORE: {gameState.totalScore}
                         </div>
                         {isConnected && (
@@ -154,7 +167,7 @@ const App: React.FC = () => {
             </div>
             
             <div className="space-y-3">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 pl-1">Campaign</div>
+                <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4 pl-1">Campaign</div>
                 {ROUNDS.map(round => {
                     const isCompleted = gameState.completedRounds.includes(round.id);
                     const isCurrent = round.id === gameState.currentRoundId;
@@ -162,8 +175,8 @@ const App: React.FC = () => {
 
                     return (
                         <div key={round.id} className={`p-4 rounded-xl border transition-all ${
-                            isCurrent ? 'border-blue-500/30 bg-blue-600/10 shadow-[0_0_20px_-5px_rgba(59,130,246,0.3)]' : 
-                            isCompleted ? 'border-slate-800 bg-slate-800/20' : 'border-transparent opacity-40'
+                            isCurrent ? 'border-indigo-500/30 bg-indigo-500/10 shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)]' : 
+                            isCompleted ? 'border-white/[0.05] bg-white/[0.02]' : 'border-transparent opacity-40'
                         }`}>
                             <div className="flex justify-between items-center mb-1">
                                 <span className={`text-sm font-bold ${isCurrent ? 'text-white' : 'text-slate-400'}`}>Round {round.id}</span>
@@ -180,8 +193,8 @@ const App: React.FC = () => {
             </div>
         </div>
         
-        <div className="mt-auto p-6 border-t border-slate-800/50">
-             <button onClick={handleSignOut} className="flex items-center gap-3 text-slate-500 hover:text-white transition-colors text-sm font-medium w-full px-2 py-2 rounded-lg hover:bg-slate-800/50">
+        <div className="mt-auto p-6 border-t border-white/[0.05]">
+             <button onClick={handleSignOut} className="flex items-center gap-3 text-white/40 hover:text-white transition-colors text-sm font-medium w-full px-2 py-2 rounded-lg hover:bg-white/[0.05]">
                  <LogOut size={16} /> Sign Out
              </button>
         </div>
@@ -195,13 +208,13 @@ const App: React.FC = () => {
                 <div className="max-w-5xl mx-auto space-y-12">
                     
                     {/* Hero Action */}
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-10 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none transition-all group-hover:bg-blue-600/20"></div>
+                    <div className="bg-gradient-to-br from-white/[0.03] to-black border border-white/[0.08] rounded-3xl p-10 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none transition-all group-hover:bg-indigo-500/20"></div>
                         
                         <h2 className="text-4xl font-extrabold mb-4 text-white relative z-10">
                             {isGameComplete ? "Challenge Complete!" : `Ready for Round ${gameState.currentRoundId}?`}
                         </h2>
-                        <p className="text-slate-400 max-w-lg mb-8 text-lg relative z-10 leading-relaxed">
+                        <p className="text-white/40 max-w-lg mb-8 text-lg relative z-10 leading-relaxed">
                             {isGameComplete 
                                 ? `You finished with a total score of ${gameState.totalScore}. Check your rank on the leaderboard below.`
                                 : "Analyze the target output. Craft the perfect prompt. One attempt per round. Precision is key."
@@ -252,15 +265,15 @@ const App: React.FC = () => {
                         </div>
                         
                         {!isConnected && leaderboard.length === 0 ? (
-                            <div className="p-12 text-center bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
-                                <Activity className="mx-auto text-slate-600 mb-3" size={32} />
-                                <p className="text-slate-400">Connecting to leaderboard server...</p>
-                                <p className="text-slate-600 text-xs mt-2">Make sure <code>node server.js</code> is running.</p>
+                            <div className="p-12 text-center bg-white/[0.02] rounded-2xl border border-white/[0.08] border-dashed">
+                                <Activity className="mx-auto text-white/30 mb-3" size={32} />
+                                <p className="text-white/40">Connecting to leaderboard server...</p>
+                                <p className="text-white/20 text-xs mt-2">Make sure <code>node server.js</code> is running.</p>
                             </div>
                         ) : (
-                            <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                            <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl">
                                 <table className="w-full text-left border-collapse">
-                                    <thead className="bg-slate-950/50 text-slate-500 text-xs uppercase font-bold tracking-wider">
+                                    <thead className="bg-black/30 text-white/40 text-xs uppercase font-bold tracking-wider">
                                         <tr>
                                             <th className="p-5 w-20 text-center">Rank</th>
                                             <th className="p-5">Player</th>
@@ -268,34 +281,34 @@ const App: React.FC = () => {
                                             <th className="p-5 text-right">Score</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-800/50">
+                                    <tbody className="divide-y divide-white/[0.05]">
                                         {leaderboard.map((entry) => (
-                                            <tr key={entry.username} className={`group hover:bg-slate-800/30 transition-colors ${entry.username === user.username ? 'bg-blue-600/5' : ''}`}>
-                                                <td className="p-5 text-center font-mono text-slate-500 group-hover:text-white font-medium">
+                                            <tr key={entry.username} className={`group hover:bg-white/[0.03] transition-colors ${entry.username === user.username ? 'bg-indigo-500/5' : ''}`}>
+                                                <td className="p-5 text-center font-mono text-white/40 group-hover:text-white font-medium">
                                                     #{entry.rank}
                                                 </td>
                                                 <td className="p-5">
                                                     <div className="flex items-center gap-4">
-                                                        <img src={entry.avatarUrl} alt="" className="w-10 h-10 rounded-full bg-slate-800 shadow-md border border-slate-700" />
+                                                        <img src={entry.avatarUrl} alt="" className="w-10 h-10 rounded-full bg-white/[0.05] shadow-md border border-white/[0.1]" />
                                                         <div className="flex flex-col">
-                                                            <span className={`font-semibold ${entry.username === user.username ? 'text-blue-400' : 'text-slate-300'}`}>
+                                                            <span className={`font-semibold ${entry.username === user.username ? 'text-indigo-400' : 'text-white/80'}`}>
                                                                 {entry.username} {entry.username === user.username && '(You)'}
                                                             </span>
-                                                            {entry.isBot && <span className="text-[10px] text-slate-600 font-mono uppercase">Bot</span>}
+                                                            {entry.isBot && <span className="text-[10px] text-white/30 font-mono uppercase">Bot</span>}
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="p-5">
                                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border ${
                                                         entry.status === 'Finished' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                                        entry.status.includes('Round') ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                        'bg-slate-700/30 text-slate-400 border-slate-600/30'
+                                                        entry.status.includes('Round') ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                                                        'bg-white/[0.03] text-white/40 border-white/[0.08]'
                                                     }`}>
                                                         {entry.status === 'Thinking...' && <Activity size={10} className="animate-pulse" />}
                                                         {entry.status}
                                                     </span>
                                                 </td>
-                                                <td className="p-5 text-right font-mono font-bold text-slate-200 text-lg">
+                                                <td className="p-5 text-right font-mono font-bold text-white/90 text-lg">
                                                     {entry.score}
                                                 </td>
                                             </tr>
