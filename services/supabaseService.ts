@@ -5,14 +5,27 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1N
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Types for attempt data
+export interface AttemptData {
+  attemptNumber: number;
+  prompt: string;
+  output: string;
+  score: number; // 0-5 scale
+  flagged: boolean;
+  flagReason?: string;
+  keywordsMatched?: string[];
+}
+
 // Types for round data storage
 export interface SubRoundData {
   subRoundId: string;
   targetPhrase: string;
-  prompt: string;
-  output: string;
-  score: number;
+  prompt: string; // Best attempt prompt
+  output: string; // Best attempt output
+  score: number; // Best score (0-5)
   timeTaken: number; // in milliseconds
+  attempts?: AttemptData[]; // All attempts made
+  bestAttemptIndex?: number;
 }
 
 export interface RoundData {

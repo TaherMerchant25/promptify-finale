@@ -21,13 +21,28 @@ export interface RoundData {
   subRounds?: SubRound[]; // Optional sub-rounds for multi-part challenges
 }
 
+export interface AttemptResult {
+  attemptNumber: number;
+  userPrompt: string;
+  generatedContent: string;
+  score: number; // 0-5 scale
+  reasoning: string;
+  flagged: boolean;
+  flagReason?: string;
+  keywordsMatched: string[];
+  keywordsTotal: string[];
+}
+
 export interface SubRoundResult {
   subRoundId: string;
   userPrompt: string;
   generatedContent: string;
-  score: number;
+  score: number; // 0-5 scale (best attempt)
   flagged: boolean;
   flagReason?: string;
+  reasoning?: string;
+  attempts: AttemptResult[]; // All attempts made
+  bestAttemptIndex: number; // Index of best scoring attempt
 }
 
 export interface RoundResult {

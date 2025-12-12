@@ -116,14 +116,24 @@ const App: React.FC = () => {
     // Save detailed round data to Supabase
     if (sessionId) {
       if (result.roundId === 1 && result.subRoundResults) {
-        // Round 1 has sub-rounds
+        // Round 1 has sub-rounds with multiple attempts
         const subRoundsData: SubRoundData[] = result.subRoundResults.map((sr, idx) => ({
           subRoundId: sr.subRoundId,
           targetPhrase: ROUNDS[0].subRounds?.[idx]?.targetPhrase || '',
           prompt: sr.userPrompt,
           output: sr.generatedContent,
-          score: sr.score,
-          timeTaken: Math.round(roundTime / result.subRoundResults!.length), // Approximate time per sub-round
+          score: sr.score, // Now 0-5 scale
+          timeTaken: Math.round(roundTime / result.subRoundResults!.length),
+          attempts: sr.attempts?.map(a => ({
+            attemptNumber: a.attemptNumber,
+            prompt: a.userPrompt,
+            output: a.generatedContent,
+            score: a.score,
+            flagged: a.flagged,
+            flagReason: a.flagReason,
+            keywordsMatched: a.keywordsMatched,
+          })),
+          bestAttemptIndex: sr.bestAttemptIndex,
         }));
         
         await leaderboardService.saveRound1Data(sessionId, subRoundsData, result.score, roundTime);
