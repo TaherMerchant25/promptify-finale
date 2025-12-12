@@ -8,12 +8,19 @@ import { PromptifyLogo } from "./promptify-logo"
 
 interface NavbarProps {
   onGetStarted?: () => void;
+  onNavigate?: (page: 'home' | 'how-to-play' | 'leaderboard') => void;
+  currentPage?: string;
 }
 
-const Navbar1: React.FC<NavbarProps> = ({ onGetStarted }) => {
+const Navbar1: React.FC<NavbarProps> = ({ onGetStarted, onNavigate, currentPage = 'home' }) => {
   const [isOpen, setIsOpen] = useState(false)
 
   const toggleMenu = () => setIsOpen(!isOpen)
+  
+  const handleNavClick = (page: 'home' | 'how-to-play' | 'leaderboard') => {
+    onNavigate?.(page);
+    setIsOpen(false);
+  }
 
   return (
     <div className="flex justify-center w-full py-6 px-4 absolute top-4 left-0 right-0 z-50">
@@ -33,17 +40,28 @@ const Navbar1: React.FC<NavbarProps> = ({ onGetStarted }) => {
         
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-8">
-          {["Home", "How to Play", "Leaderboard"].map((item) => (
+          {[
+            { label: "Home", page: "home" as const },
+            { label: "How to Play", page: "how-to-play" as const },
+            { label: "Leaderboard", page: "leaderboard" as const }
+          ].map((item) => (
             <motion.div
-              key={item}
+              key={item.label}
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
               whileHover={{ scale: 1.05 }}
             >
-              <span className="text-sm text-white/60 hover:text-white transition-colors font-medium cursor-default">
-                {item}
-              </span>
+              <button
+                onClick={() => handleNavClick(item.page)}
+                className={`text-sm transition-colors font-medium ${
+                  currentPage === item.page 
+                    ? 'text-white' 
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                {item.label}
+              </button>
             </motion.div>
           ))}
         </nav>
@@ -104,17 +122,28 @@ const Navbar1: React.FC<NavbarProps> = ({ onGetStarted }) => {
             </motion.div>
 
             <div className="flex flex-col space-y-6">
-              {["Home", "How to Play", "Leaderboard"].map((item, i) => (
+              {[
+                { label: "Home", page: "home" as const },
+                { label: "How to Play", page: "how-to-play" as const },
+                { label: "Leaderboard", page: "leaderboard" as const }
+              ].map((item, i) => (
                 <motion.div
-                  key={item}
+                  key={item.label}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.1 + 0.1 }}
                   exit={{ opacity: 0, x: 20 }}
                 >
-                  <span className="text-base text-white/60 font-medium cursor-default">
-                    {item}
-                  </span>
+                  <button
+                    onClick={() => handleNavClick(item.page)}
+                    className={`text-base font-medium ${
+                      currentPage === item.page 
+                        ? 'text-white' 
+                        : 'text-white/60'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
                 </motion.div>
               ))}
 

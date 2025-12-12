@@ -7,6 +7,7 @@ import { Sparkles, Zap, Brain, Trophy, ArrowRight } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
+  onNavigate?: (page: 'how-to-play' | 'leaderboard' | 'landing') => void;
 }
 
 interface FeatureCardProps {
@@ -39,7 +40,11 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
   </motion.div>
 );
 
-const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onNavigate }) => {
+  const handleNavigate = (page: 'home' | 'how-to-play' | 'leaderboard') => {
+    if (page === 'home') return;
+    onNavigate?.(page);
+  };
   const features = [
     {
       icon: Brain,
@@ -66,7 +71,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
   return (
     <div className="relative">
       {/* Navbar */}
-      <Navbar1 onGetStarted={onGetStarted} />
+      <Navbar1 onGetStarted={onGetStarted} onNavigate={handleNavigate} currentPage="home" />
 
       {/* Hero Section with Geometric Shapes */}
       <div className="relative">

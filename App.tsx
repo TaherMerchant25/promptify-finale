@@ -6,12 +6,14 @@ import { leaderboardService, GameSession, SubRoundData, RoundData as SupabaseRou
 import Auth from './components/Auth';
 import GameRound from './components/GameRound';
 import LandingPage from './components/LandingPage';
+import Leaderboard from './components/Leaderboard';
+import HowToPlay from './components/HowToPlay';
 import { Trophy, LogOut, LayoutGrid, Activity, Wifi, RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [geminiService, setGeminiService] = useState<GeminiService | null>(null);
-  const [view, setView] = useState<'landing' | 'auth' | 'dashboard' | 'game'>('landing');
+  const [view, setView] = useState<'landing' | 'auth' | 'dashboard' | 'game' | 'leaderboard' | 'how-to-play'>('landing');
   
   const initialGameState: GameState = {
     currentRoundId: 1,
@@ -199,7 +201,20 @@ const App: React.FC = () => {
 
   // Landing Page
   if (view === 'landing' && !user) {
-    return <LandingPage onGetStarted={() => setView('auth')} />;
+    return <LandingPage 
+      onGetStarted={() => setView('auth')} 
+      onNavigate={(page) => setView(page)}
+    />;
+  }
+
+  // How to Play Page
+  if (view === 'how-to-play') {
+    return <HowToPlay onBack={() => setView('landing')} />;
+  }
+
+  // Leaderboard Page
+  if (view === 'leaderboard') {
+    return <Leaderboard onBack={() => setView('landing')} />;
   }
 
   // Auth Guard
