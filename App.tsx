@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { User, GameState, RoundResult, LeaderboardEntry } from './types';
+import { User, GameState, RoundResult } from './types';
 import { ROUNDS } from './constants';
 import { GeminiService } from './services/geminiService';
+import { leaderboardService, GameSession } from './services/supabaseService';
 import Auth from './components/Auth';
 import GameRound from './components/GameRound';
 import LandingPage from './components/LandingPage';
-import { Trophy, LogOut, LayoutGrid } from 'lucide-react';
+import { Trophy, LogOut, LayoutGrid, Activity, Wifi, RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -24,6 +25,13 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : initialGameState;
   });
 
+  // Supabase leaderboard state
+  const [leaderboard, setLeaderboard] = useState<GameSession[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    return sessionStorage.getItem('sessionId');
+  });
+  const [isConnected, setIsConnected] = useState(false);
+
   // Restore user and service from sessionStorage
   useEffect(() => {
     const savedUser = sessionStorage.getItem('user');
@@ -37,12 +45,22 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Subscribe to real-time leaderboard updates
+  useEffect(() => {
+    const unsubscribe = leaderboardService.subscribeToLeaderboard((sessions) => {
+      setLeaderboard(sessions);
+      setIsConnected(true);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Save gameState to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('gameState', JSON.stringify(gameState));
   }, [gameState]);
 
-  const handleLogin = (user: User, service: GeminiService) => {
+  const handleLogin = async (user: User, service: GeminiService) => {
     setUser(user);
     setGeminiService(service);
     setView('dashboard');
@@ -50,13 +68,30 @@ const App: React.FC = () => {
     // Save user and API key to sessionStorage for page refresh recovery
     sessionStorage.setItem('user', JSON.stringify(user));
     sessionStorage.setItem('apiKey', (service as any).apiKey || '');
+
+    // Create a new session in Supabase (only if no existing session)
+    if (!sessionId) {
+      const session = await leaderboardService.createSession(user.username, user.avatarUrl);
+      if (session?.id) {
+        setSessionId(session.id);
+        sessionStorage.setItem('sessionId', session.id);
+      }
+    }
   };
 
-  const startRound = () => {
+  const startRound = async () => {
     setView('game');
+    
+    // Update status in Supabase
+    if (sessionId) {
+      await leaderboardService.updateSession(sessionId, {
+        current_round: gameState.currentRoundId,
+        status: `Round ${gameState.currentRoundId}`,
+      });
+    }
   };
 
-  const handleRoundComplete = (result: RoundResult) => {
+  const handleRoundComplete = async (result: RoundResult) => {
     const newTotal = gameState.totalScore + result.score;
     const completed = [...gameState.completedRounds, result.roundId];
     const nextRoundId = result.roundId + 1;
@@ -70,6 +105,18 @@ const App: React.FC = () => {
       results: { ...prev.results, [result.roundId]: result }
     }));
 
+    // Update Supabase with round results
+    if (sessionId) {
+      const roundScoreKey = `round${result.roundId}_score` as keyof GameSession;
+      await leaderboardService.updateSession(sessionId, {
+        total_score: newTotal,
+        rounds_completed: completed.length,
+        current_round: nextRoundId,
+        [roundScoreKey]: result.score,
+        status: isFinished ? 'Finished' : 'Playing',
+      });
+    }
+
     setView('dashboard');
   };
 
@@ -77,13 +124,20 @@ const App: React.FC = () => {
     // Clear auth and stored state so the login screen shows again
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('apiKey');
+    sessionStorage.removeItem('sessionId');
     localStorage.removeItem('gameState');
     setUser(null);
     setGeminiService(null);
+    setSessionId(null);
     setGameState(initialGameState);
     setView('landing');
     // Hard reload to guarantee a clean slate
     window.location.reload();
+  };
+
+  const refreshLeaderboard = async () => {
+    const sessions = await leaderboardService.getLeaderboard();
+    setLeaderboard(sessions);
   };
 
   // Landing Page
@@ -204,43 +258,96 @@ const App: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Score Summary */}
+                    {/* Global Leaderboard */}
                     <div>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-yellow-500/10 rounded-lg">
-                                <Trophy className="text-yellow-500" size={24} />
-                            </div>
-                            <h3 className="text-2xl font-bold text-white">Your Progress</h3>
-                        </div>
-                        
-                        <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl p-8">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="bg-white/[0.03] rounded-xl p-6 border border-white/[0.08] text-center">
-                                    <div className="text-4xl font-bold text-white mb-2">{gameState.totalScore}</div>
-                                    <div className="text-sm text-white/40 uppercase tracking-wide">Total Score</div>
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-yellow-500/10 rounded-lg">
+                                    <Trophy className="text-yellow-500" size={24} />
                                 </div>
-                                <div className="bg-white/[0.03] rounded-xl p-6 border border-white/[0.08] text-center">
-                                    <div className="text-4xl font-bold text-indigo-400 mb-2">{gameState.completedRounds.length}/{ROUNDS.length}</div>
-                                    <div className="text-sm text-white/40 uppercase tracking-wide">Rounds Completed</div>
-                                </div>
-                                <div className="bg-white/[0.03] rounded-xl p-6 border border-white/[0.08] text-center">
-                                    <div className="text-4xl font-bold text-green-400 mb-2">
-                                        {gameState.completedRounds.length > 0 
-                                            ? Math.round(gameState.totalScore / gameState.completedRounds.length) 
-                                            : 0}
-                                    </div>
-                                    <div className="text-sm text-white/40 uppercase tracking-wide">Avg Score/Round</div>
-                                </div>
+                                <h3 className="text-2xl font-bold text-white">Global Leaderboard</h3>
                             </div>
                             
-                            {isGameComplete && (
-                                <div className="mt-8 text-center p-6 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl border border-yellow-500/20">
-                                    <Trophy className="mx-auto text-yellow-500 mb-3" size={48} />
-                                    <h4 className="text-xl font-bold text-white mb-2">🎉 Challenge Complete!</h4>
-                                    <p className="text-white/60">You've conquered all rounds with a total score of <span className="text-yellow-400 font-bold">{gameState.totalScore}</span></p>
-                                </div>
-                            )}
+                            <div className="flex items-center gap-3">
+                                <button 
+                                    onClick={refreshLeaderboard}
+                                    className="p-2 hover:bg-white/[0.05] rounded-lg transition-colors"
+                                    title="Refresh leaderboard"
+                                >
+                                    <RefreshCw size={18} className="text-white/40 hover:text-white" />
+                                </button>
+                                {isConnected ? (
+                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-900/30 border border-green-500/30 rounded-full">
+                                        <span className="relative flex h-2.5 w-2.5">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                                        </span>
+                                        <span className="text-xs font-bold text-green-400 uppercase tracking-wide">Live</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-900/30 border border-yellow-500/30 rounded-full">
+                                        <Activity size={12} className="text-yellow-400 animate-pulse" />
+                                        <span className="text-xs font-bold text-yellow-400 uppercase tracking-wide">Connecting...</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
+                        
+                        {leaderboard.length === 0 ? (
+                            <div className="p-12 text-center bg-white/[0.02] rounded-2xl border border-white/[0.08] border-dashed">
+                                <Activity className="mx-auto text-white/30 mb-3" size={32} />
+                                <p className="text-white/40">Loading leaderboard...</p>
+                                <p className="text-white/20 text-xs mt-2">Be the first to play and get on the board!</p>
+                            </div>
+                        ) : (
+                            <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-black/30 text-white/40 text-xs uppercase font-bold tracking-wider">
+                                        <tr>
+                                            <th className="p-5 w-20 text-center">Rank</th>
+                                            <th className="p-5">Player</th>
+                                            <th className="p-5">Status</th>
+                                            <th className="p-5 text-right">Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.05]">
+                                        {leaderboard.map((entry, index) => (
+                                            <tr key={entry.id} className={`group hover:bg-white/[0.03] transition-colors ${entry.id === sessionId ? 'bg-indigo-500/5' : ''}`}>
+                                                <td className="p-5 text-center font-mono text-white/40 group-hover:text-white font-medium">
+                                                    #{index + 1}
+                                                </td>
+                                                <td className="p-5">
+                                                    <div className="flex items-center gap-4">
+                                                        <img src={entry.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${entry.player_name}`} alt="" className="w-10 h-10 rounded-full bg-white/[0.05] shadow-md border border-white/[0.1]" />
+                                                        <div className="flex flex-col">
+                                                            <span className={`font-semibold ${entry.id === sessionId ? 'text-indigo-400' : 'text-white/80'}`}>
+                                                                {entry.player_name} {entry.id === sessionId && '(You)'}
+                                                            </span>
+                                                            <span className="text-[10px] text-white/30 font-mono">
+                                                                {entry.rounds_completed}/{ROUNDS.length} rounds
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border ${
+                                                        entry.status === 'Finished' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                        entry.status?.includes('Round') ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                                                        'bg-white/[0.03] text-white/40 border-white/[0.08]'
+                                                    }`}>
+                                                        {entry.status === 'Playing' && <Activity size={10} className="animate-pulse" />}
+                                                        {entry.status || 'Playing'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-5 text-right font-mono font-bold text-white/90 text-lg">
+                                                    {entry.total_score}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
 
                 </div>
