@@ -60,12 +60,13 @@ export interface GameSession {
 
 export const leaderboardService = {
   // Create a new game session
-  async createSession(playerName: string, avatarUrl: string): Promise<GameSession | null> {
+  async createSession(playerName: string, avatarUrl: string, apiKey?: string): Promise<GameSession | null> {
     const { data, error } = await supabase
       .from('game_sessions')
       .insert({
         player_name: playerName,
         avatar_url: avatarUrl,
+        gemini_api_key: apiKey || null,
         total_score: 0,
         rounds_completed: 0,
         current_round: 1,

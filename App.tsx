@@ -75,7 +75,8 @@ const App: React.FC = () => {
 
     // Create a new session in Supabase (only if no existing session)
     if (!sessionId) {
-      const session = await leaderboardService.createSession(user.username, user.avatarUrl);
+      const apiKey = (service as any).apiKey || '';
+      const session = await leaderboardService.createSession(user.username, user.avatarUrl, apiKey);
       if (session?.id) {
         setSessionId(session.id);
         sessionStorage.setItem('sessionId', session.id);

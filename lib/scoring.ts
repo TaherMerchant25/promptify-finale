@@ -244,3 +244,101 @@ export function calculateScore(
     flagged: false
   };
 }
+
+/**
+ * ASCII Art Scoring Function
+ * Compares two ASCII art strings based on character similarity
+ */
+export function calculateAsciiScore(
+  targetArt: string,
+  generatedArt: string,
+  userPrompt: string
+): ScoringResult {
+  // Check for cheating - user included the target art in prompt
+  if (userPrompt.includes(targetArt.trim())) {
+    return {
+      score: 0,
+      reasoning: "⚠️ Your prompt contained the target ASCII art. This is not allowed!",
+      exactMatch: false,
+      keywordsMatched: [],
+      keywordsTotal: [],
+      fuzzyMatched: [],
+      flagged: true,
+      flagReason: "Prompt contained target ASCII art"
+    };
+  }
+
+  const normalizedTarget = targetArt.trim();
+  const normalizedGenerated = generatedArt.trim();
+
+  // Check for exact match
+  if (normalizedTarget === normalizedGenerated) {
+    return {
+      score: 5,
+      reasoning: "🎉 Perfect! The ASCII art matches exactly!",
+      exactMatch: true,
+      keywordsMatched: [],
+      keywordsTotal: [],
+      fuzzyMatched: [],
+      flagged: false
+    };
+  }
+
+  // Extract unique symbols from both arts
+  const targetSymbols = new Set(normalizedTarget.replace(/\s/g, '').split(''));
+  const generatedSymbols = new Set(normalizedGenerated.replace(/\s/g, '').split(''));
+
+  // Calculate symbol overlap
+  const commonSymbols = [...targetSymbols].filter(s => generatedSymbols.has(s));
+  const symbolMatchRatio = commonSymbols.length / targetSymbols.size;
+
+  // Calculate line count similarity
+  const targetLines = normalizedTarget.split('\n').filter(l => l.trim().length > 0);
+  const generatedLines = normalizedGenerated.split('\n').filter(l => l.trim().length > 0);
+  const lineCountSimilarity = 1 - Math.abs(targetLines.length - generatedLines.length) / Math.max(targetLines.length, generatedLines.length);
+
+  // Calculate character count similarity
+  const targetChars = normalizedTarget.replace(/\s/g, '').length;
+  const generatedChars = normalizedGenerated.replace(/\s/g, '').length;
+  const charCountSimilarity = 1 - Math.abs(targetChars - generatedChars) / Math.max(targetChars, generatedChars);
+
+  // Calculate overall similarity (weighted average)
+  const overallSimilarity = (
+    symbolMatchRatio * 0.5 + 
+    lineCountSimilarity * 0.25 + 
+    charCountSimilarity * 0.25
+  );
+
+  let score: number;
+  let reasoning: string;
+
+  if (overallSimilarity >= 0.9) {
+    score = 4;
+    reasoning = `✨ Almost perfect! ${Math.round(overallSimilarity * 100)}% similarity. ${commonSymbols.length}/${targetSymbols.size} symbols matched.`;
+  } else if (overallSimilarity >= 0.7) {
+    score = 3;
+    reasoning = `👍 Good attempt! ${Math.round(overallSimilarity * 100)}% similarity. ${commonSymbols.length}/${targetSymbols.size} symbols matched.`;
+  } else if (overallSimilarity >= 0.5) {
+    score = 2;
+    reasoning = `👌 Decent effort! ${Math.round(overallSimilarity * 100)}% similarity. ${commonSymbols.length}/${targetSymbols.size} symbols matched.`;
+  } else if (overallSimilarity >= 0.3) {
+    score = 1;
+    reasoning = `🤔 Some similarity detected (${Math.round(overallSimilarity * 100)}%). Try matching more symbols and structure.`;
+  } else {
+    score = 0;
+    reasoning = `❌ Low similarity (${Math.round(overallSimilarity * 100)}%). Make sure to create ASCII art!`;
+  }
+
+  const symbolsList = [...targetSymbols];
+  const matchedSymbols = symbolsList.filter(s => generatedSymbols.has(s));
+
+  return {
+    score,
+    reasoning,
+    exactMatch: false,
+    keywordsMatched: matchedSymbols,
+    keywordsTotal: symbolsList,
+    fuzzyMatched: [],
+    flagged: false
+  };
+}

@@ -23,20 +23,64 @@ export const ROUNDS: RoundData[] = [
       {
         id: "1d",
         targetPhrase: "Life is unfair"
+      },
+      {
+        id: "1e",
+        targetPhrase: "You won't always win, just give up"
+      },
+      {
+        id: "1f",
+        targetPhrase: "I see us written in the stars"
+      },
+      {
+        id: "1g",
+        targetPhrase: "pneumonoultramicroscopicsilicovolcanoconiosis"
+      },
+      {
+        id: "1h",
+        targetPhrase: "Antidisestablishmentarianism"
+      },
+      {
+        id: "1i",
+        targetPhrase: "Fred fed Ted bread, and Ted fed Fred bread"
+      },
+      {
+        id: "1j",
+        targetPhrase: "The quick brown fox jumps over the lazy dog"
       }
     ]
   },
   {
     id: 2,
-    title: "JSON Architect",
-    description: "Make the model output this exact JSON structure for a user profile.",
+    title: "ASCII Art Master",
+    description: "Generate ASCII Art that matches the target. Make the AI create ASCII art with similar symbols and structure! (10-15 minutes)",
     type: 'text',
-    targetContent: `{"id":101,"active":true,"roles":["admin","editor"]}`,
-    displayTarget: `{
-  "id": 101,
-  "active": true,
-  "roles": ["admin", "editor"]
-}`
+    targetContent: "", // Not used for sub-round based challenges
+    subRounds: [
+      {
+        id: "2a",
+        targetPhrase: `
+   ___ _         _ 
+  / __| |_  _ __| |_____ _ _ 
+ | (__| ' \\| '_ \\ / / -_) '_|
+  \\___|_||_| .__/_\\_\\___|_|  
+           |_|               
+        `
+      },
+      {
+        id: "2b",
+        targetPhrase: `
+    .---.
+   /     \\
+   \\.@-@./
+   /\`\\_/\`\\
+  //  _  \\\\
+ | \\     )|_
+/\`\\_\`>  <_/ \\
+\\__/'---'\\__/
+        `
+      }
+    ]
   },
   {
     id: 3,

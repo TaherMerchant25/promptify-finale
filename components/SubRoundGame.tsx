@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RoundData, RoundResult, SubRoundResult, AttemptResult } from '../types';
 import { GeminiService } from '../services/geminiService';
-import { calculateScore, ScoringResult } from '../lib/scoring';
+import { calculateScore, calculateAsciiScore, ScoringResult } from '../lib/scoring';
 import { Send, Loader2, CheckCircle2, ArrowRight, Clock, Target, RotateCcw, AlertTriangle, Star } from 'lucide-react';
 
 interface SubRoundGameProps {
@@ -30,6 +30,10 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
   const attemptsRemaining = MAX_ATTEMPTS - currentAttempts.length - (currentResult ? 1 : 0);
   const canTryAgain = attemptsRemaining > 0 && currentResult && !currentResult.flagged;
   const mustSubmit = attemptsRemaining === 0 || (currentResult?.score === 5);
+  
+  // Calculate cumulative score
+  const cumulativeScore = subRoundResults.reduce((sum, r) => sum + r.score, 0);
+  const currentTotalScore = currentResult ? cumulativeScore + currentResult.score : cumulativeScore;
 
   // Timer effect
   useEffect(() => {
@@ -80,12 +84,23 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
       // Generate content using Gemini
       const output = await service.generateText(prompt);
       
-      // Calculate score using fuzzy matching (local, no API call)
-      const scoringResult: ScoringResult = calculateScore(
-        currentSubRound.targetPhrase,
-        output,
-        prompt
-      );
+      // Calculate score based on round type
+      let scoringResult: ScoringResult;
+      if (round.title === "ASCII Art Master") {
+        // Use ASCII art scoring for Round 2
+        scoringResult = calculateAsciiScore(
+          currentSubRound.targetPhrase,
+          output,
+          prompt
+        );
+      } else {
+        // Use regular text scoring for Round 1
+        scoringResult = calculateScore(
+          currentSubRound.targetPhrase,
+          output,
+          prompt
+        );
+      }
 
       const attemptNumber = currentAttempts.length + 1;
       const result: AttemptResult = {
@@ -458,6 +473,20 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
               }`} 
             />
           ))}
+        </div>
+
+        {/* Cumulative Score Display */}
+        <div className="mb-4 p-3 bg-gradient-to-r from-indigo-500/10 to-rose-500/10 border border-white/[0.08] rounded-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-white/60 text-sm">Current Round Score:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold text-white">{cumulativeScore}</span>
+              <span className="text-white/40 text-sm">/ {subRounds.length * 5}</span>
+            </div>
+          </div>
+          <div className="mt-1 text-xs text-white/40">
+            Completed: {subRoundResults.length}/{subRounds.length} challenges
+          </div>
         </div>
 
         <p className="text-white/40 mb-4">{round.description}</p>
