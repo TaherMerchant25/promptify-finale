@@ -16,7 +16,11 @@ export class SocketService {
     if (this.socket?.connected) return;
 
     this.socket = io(SERVER_URL, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'], // Start with polling, upgrade to websocket
+      upgrade: true,
+      rememberUpgrade: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     this.socket.on("connect", () => {
