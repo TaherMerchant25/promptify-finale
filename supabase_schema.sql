@@ -1,10 +1,10 @@
--- Supabase SQL Schema for Promptify Leaderboard
+-- Supabase SQL Schema for Promptify - Full Game Data Storage
 -- Run this in your Supabase SQL Editor
 
 -- Drop existing table if you want to start fresh (CAREFUL - this deletes data!)
 -- DROP TABLE IF EXISTS game_sessions;
 
--- Create the game_sessions table for leaderboard
+-- Create the game_sessions table with full game data
 CREATE TABLE IF NOT EXISTS game_sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   
@@ -22,6 +22,24 @@ CREATE TABLE IF NOT EXISTS game_sessions (
   round2_score INTEGER,
   round3_score INTEGER,
   
+  -- Time tracking (in milliseconds)
+  round1_time INTEGER,
+  round2_time INTEGER,
+  round3_time INTEGER,
+  total_time INTEGER,
+  
+  -- Round 1 Data (prompts, outputs for each sub-round)
+  round1_data JSONB DEFAULT '[]'::jsonb,
+  -- Format: [{ subRoundId: "1a", prompt: "...", output: "...", score: 100, timeTaken: 5000 }, ...]
+  
+  -- Round 2 Data
+  round2_data JSONB DEFAULT '[]'::jsonb,
+  -- Format: [{ prompt: "...", output: "...", targetImage: "...", score: 85, timeTaken: 8000 }]
+  
+  -- Round 3 Data  
+  round3_data JSONB DEFAULT '[]'::jsonb,
+  -- Format: [{ prompt: "...", output: "...", score: 90, timeTaken: 6000 }]
+  
   -- Status for display
   status VARCHAR(50) DEFAULT 'Playing',
   
@@ -33,21 +51,25 @@ CREATE TABLE IF NOT EXISTS game_sessions (
 -- Create indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_game_sessions_total_score ON game_sessions(total_score DESC);
 CREATE INDEX IF NOT EXISTS idx_game_sessions_updated_at ON game_sessions(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_game_sessions_player_name ON game_sessions(player_name);
 
 -- Enable Row Level Security
 ALTER TABLE game_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Allow anyone to read (for leaderboard)
+DROP POLICY IF EXISTS "Allow public read" ON game_sessions;
 CREATE POLICY "Allow public read" ON game_sessions
   FOR SELECT TO anon, authenticated
   USING (true);
 
 -- Allow anyone to insert (create new sessions)
+DROP POLICY IF EXISTS "Allow public insert" ON game_sessions;
 CREATE POLICY "Allow public insert" ON game_sessions
   FOR INSERT TO anon, authenticated
   WITH CHECK (true);
 
 -- Allow anyone to update (update their session)
+DROP POLICY IF EXISTS "Allow public update" ON game_sessions;
 CREATE POLICY "Allow public update" ON game_sessions
   FOR UPDATE TO anon, authenticated
   USING (true)

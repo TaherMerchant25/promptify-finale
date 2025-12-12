@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, GameState, RoundResult } from './types';
 import { ROUNDS } from './constants';
 import { GeminiService } from './services/geminiService';
-import { leaderboardService, GameSession } from './services/supabaseService';
+import { leaderboardService, GameSession, SubRoundData, RoundData as SupabaseRoundData } from './services/supabaseService';
 import Auth from './components/Auth';
 import GameRound from './components/GameRound';
 import LandingPage from './components/LandingPage';
@@ -31,6 +31,10 @@ const App: React.FC = () => {
     return sessionStorage.getItem('sessionId');
   });
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Track game start time for total time calculation
+  const gameStartTime = useRef<number>(Date.now());
+  const roundStartTime = useRef<number>(Date.now());
 
   // Restore user and service from sessionStorage
   useEffect(() => {
@@ -81,6 +85,7 @@ const App: React.FC = () => {
 
   const startRound = async () => {
     setView('game');
+    roundStartTime.current = Date.now(); // Track when round starts
     
     // Update status in Supabase
     if (sessionId) {
@@ -92,6 +97,9 @@ const App: React.FC = () => {
   };
 
   const handleRoundComplete = async (result: RoundResult) => {
+    const roundTime = Date.now() - roundStartTime.current;
+    const totalGameTime = Date.now() - gameStartTime.current;
+    
     const newTotal = gameState.totalScore + result.score;
     const completed = [...gameState.completedRounds, result.roundId];
     const nextRoundId = result.roundId + 1;
@@ -105,16 +113,54 @@ const App: React.FC = () => {
       results: { ...prev.results, [result.roundId]: result }
     }));
 
-    // Update Supabase with round results
+    // Save detailed round data to Supabase
     if (sessionId) {
-      const roundScoreKey = `round${result.roundId}_score` as keyof GameSession;
-      await leaderboardService.updateSession(sessionId, {
-        total_score: newTotal,
-        rounds_completed: completed.length,
-        current_round: nextRoundId,
-        [roundScoreKey]: result.score,
-        status: isFinished ? 'Finished' : 'Playing',
-      });
+      if (result.roundId === 1 && result.subRoundResults) {
+        // Round 1 has sub-rounds
+        const subRoundsData: SubRoundData[] = result.subRoundResults.map((sr, idx) => ({
+          subRoundId: sr.subRoundId,
+          targetPhrase: ROUNDS[0].subRounds?.[idx]?.targetPhrase || '',
+          prompt: sr.userPrompt,
+          output: sr.generatedContent,
+          score: sr.score,
+          timeTaken: Math.round(roundTime / result.subRoundResults!.length), // Approximate time per sub-round
+        }));
+        
+        await leaderboardService.saveRound1Data(sessionId, subRoundsData, result.score, roundTime);
+      } else if (result.roundId === 2) {
+        const roundData: SupabaseRoundData[] = [{
+          prompt: result.userPrompt,
+          output: result.generatedContent,
+          score: result.score,
+          timeTaken: roundTime,
+          targetContent: ROUNDS[1].targetContent,
+        }];
+        
+        await leaderboardService.saveRound2Data(
+          sessionId, 
+          roundData, 
+          result.score, 
+          roundTime, 
+          gameState.totalScore
+        );
+      } else if (result.roundId === 3) {
+        const roundData: SupabaseRoundData[] = [{
+          prompt: result.userPrompt,
+          output: result.generatedContent,
+          score: result.score,
+          timeTaken: roundTime,
+          targetContent: ROUNDS[2].targetContent,
+        }];
+        
+        await leaderboardService.saveRound3Data(
+          sessionId, 
+          roundData, 
+          result.score, 
+          roundTime, 
+          gameState.totalScore,
+          totalGameTime
+        );
+      }
     }
 
     setView('dashboard');
