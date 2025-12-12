@@ -1,0 +1,172 @@
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+
+// Helpers
+const fileToGenerativePart = async (url: string): Promise<{ inlineData: { data: string; mimeType: string } }> => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+
+  const base64 = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+    reader.readAsDataURL(blob);
+  });
+
+  return {
+    inlineData: {
+      data: base64 as string,
+      mimeType: blob.type,
+    },
+  };
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export class GeminiService {
+  public apiKey: string;
+  private ai: GoogleGenAI;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+    this.ai = new GoogleGenAI({ apiKey });
+  }
+
+  /** Validate API key */
+  async validateKey(): Promise<boolean> {
+    try {
+      await this.ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: "ping" }] }],
+      });
+      return true;
+    } catch (e) {
+      console.error("Key validation failed", e);
+      return false;
+    }
+  }
+
+  /** TEXT GENERATION */
+  async generateText(prompt: string): Promise<string> {
+    const resp = await this.withOverloadRetry(() =>
+      this.ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      })
+    );
+
+    return resp.text || "";
+  }
+
+  /** IMAGE GENERATION — fixed */
+  async generateImage(prompt: string): Promise<string> {
+    const resp: any = await this.withOverloadRetry(() =>
+      this.ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      })
+    );
+
+    /* Gemini image responses appear in different places depending on model + SDK version */
+    const parts =
+      resp?.candidates?.[0]?.content?.parts ||
+      resp?.candidates?.[0]?.content ||
+      resp?.parts ||
+      [];
+
+    const img = parts.find((p: any) => p.inlineData);
+
+    if (!img) {
+      throw new Error("No image returned. Your key may not have image-generation access.");
+    }
+
+    return `data:${img.inlineData.mimeType};base64,${img.inlineData.data}`;
+  }
+
+  /** Retry 503 overload */
+  private async withOverloadRetry<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const status = err?.error?.status || err?.status || err?.code;
+      if (status === "UNAVAILABLE" || status === 503) {
+        console.warn("⚠️ Model overloaded — retrying…");
+        await sleep(800);
+        return await fn();
+      }
+      throw err;
+    }
+  }
+
+  /** JUDGING MODEL (Text or Image similarity) */
+  async calculateSimilarity(
+    target: string,
+    generated: string,
+    type: "text" | "image"
+  ): Promise<{ score: number; reasoning: string }> {
+    const judgeSchema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        score: { type: Type.NUMBER },
+        reasoning: { type: Type.STRING },
+      },
+      required: ["score", "reasoning"],
+    };
+
+    /* -------- TEXT SIMILARITY -------- */
+    if (type === "text") {
+      const prompt = `
+        Evaluate similarity between TARGET and GENERATED.
+        Score 0–100.
+        Be strict and explain briefly.
+
+        TARGET:
+        """${target}"""
+
+        GENERATED:
+        """${generated}"""
+      `;
+
+      const resp = await this.ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: judgeSchema,
+        },
+      });
+
+      const json = JSON.parse(resp.text || "{}");
+      return { score: json.score || 0, reasoning: json.reasoning || "Failed to judge." };
+    }
+
+    /* -------- IMAGE SIMILARITY -------- */
+    const targetImg = await fileToGenerativePart(target);
+
+    const base64Generated = generated.replace(/^data:image\/\w+;base64,/, "");
+    const genImg = {
+      inlineData: {
+        data: base64Generated,
+        mimeType: "image/png",
+      },
+    };
+
+    const prompt = `
+      Compare these two images:
+      - Image 1: TARGET
+      - Image 2: GENERATED
+      Score 0–100 based on similarity in composition, colors, objects, and style.
+      Be strict.
+    `;
+
+    const resp = await this.ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [targetImg, genImg, { text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: judgeSchema,
+      },
+    });
+
+    const json = JSON.parse(resp.text || "{}");
+    return { score: json.score || 0, reasoning: json.reasoning || "Failed to judge." };
+  }
+}
