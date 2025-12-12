@@ -4,8 +4,5 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/(.*)", "destination": "/" }
-  ],
-  "env": {
-    "VITE_BACKEND_URL": "@backend_url"
-  }
+  ]
 }
