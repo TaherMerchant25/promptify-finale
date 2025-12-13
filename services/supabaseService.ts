@@ -61,28 +61,31 @@ export interface GameSession {
 export const leaderboardService = {
   // Create a new game session
   async createSession(playerName: string, avatarUrl: string, apiKey?: string): Promise<GameSession | null> {
-    const { data, error } = await supabase
-      .from('game_sessions')
-      .insert({
-        player_name: playerName,
-        avatar_url: avatarUrl,
-        gemini_api_key: apiKey || null,
-        total_score: 0,
-        rounds_completed: 0,
-        current_round: 1,
-        status: 'Playing',
-        round1_data: [],
-        round2_data: [],
-        round3_data: [],
-      })
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('game_sessions')
+        .insert({
+          player_name: playerName,
+          avatar_url: avatarUrl,
+          gemini_api_key: apiKey || null,
+          total_score: 0,
+          rounds_completed: 0,
+          current_round: 1,
+          status: 'Playing',
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error creating session:', error);
+      if (error) {
+        console.error('Error creating session:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.error('Exception in createSession:', err);
       return null;
     }
-    return data;
   },
 
   // Update session with round results
