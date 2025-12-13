@@ -53,7 +53,7 @@ export const ROUNDS: RoundData[] = [
   {
     id: 2,
     title: "ASCII Art Master",
-    description: "Generate ASCII Art from images using Gemini's vision. Make the AI create ASCII art matching the target images! (10-15 minutes)",
+    description: "Generate ASCII Art using Gemini. Create creative ASCII art! Note: This round will be judged manually. (10-15 minutes)",
     type: 'image',
     targetContent: "/ascii-art-hacker.jpg",
     subRounds: [
@@ -70,7 +70,7 @@ export const ROUNDS: RoundData[] = [
   {
     id: 3,
     title: "Ditto My Buddy",
-    description: "Replicate the frontend of dtu.ac.in with a different theme. Upload your single HTML file with embedded CSS. Bonus points for animations! (30 points)",
+    description: "Replicate the frontend of dtu.ac.in with a different theme. Upload your single HTML file with embedded CSS. Bonus points for animations! Note: This round will be judged manually.",
     type: 'html-upload',
     targetContent: "https://dtu.ac.in",
     displayTarget: "Create a website similar to DTU's homepage with your own creative theme",

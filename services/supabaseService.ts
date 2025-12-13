@@ -312,4 +312,42 @@ export const leaderboardService = {
       return null;
     }
   },
+
+  // Submit Round 2/3 for manual review
+  async submitForManualReview(
+    sessionId: string,
+    playerName: string,
+    roundNumber: number,
+    subRoundId: string,
+    userPrompt: string,
+    geminiOutput: string,
+    targetReference: string,
+    attemptNumber: number = 1,
+    htmlFileUrl?: string
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('manual_review_submissions')
+        .insert({
+          session_id: sessionId,
+          player_name: playerName,
+          round_number: roundNumber,
+          sub_round_id: subRoundId,
+          user_prompt: userPrompt,
+          gemini_output: geminiOutput,
+          target_reference: targetReference,
+          attempt_number: attemptNumber,
+          html_file_url: htmlFileUrl || null,
+        });
+
+      if (error) {
+        console.error('Error submitting for manual review:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Exception in submitForManualReview:', err);
+      return false;
+    }
+  },
 };

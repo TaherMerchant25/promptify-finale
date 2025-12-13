@@ -110,18 +110,12 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
       let scoringResult: ScoringResult;
       
       if (round.type === 'html-upload') {
-        // Round 3: HTML comparison
+        // Round 3: HTML upload - No automatic scoring, store for manual review
         output = uploadedHtml;
-        const geminiScore = await service.compareHtml(
-          currentSubRound.targetPhrase, // Target description
-          uploadedHtml
-        );
-        // Convert 0-100 to 0-5 scale
-        const normalizedScore = Math.round((geminiScore.score / 100) * 5);
         scoringResult = {
-          score: normalizedScore,
-          reasoning: geminiScore.reasoning,
-          exactMatch: normalizedScore === 5,
+          score: 0, // Will be scored manually
+          reasoning: 'Submitted for manual review',
+          exactMatch: false,
           keywordsMatched: [],
           keywordsTotal: [],
           fuzzyMatched: [],
@@ -132,17 +126,11 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
         output = await service.generateText(prompt);
         
         if (round.type === 'image') {
-          // Round 2: Image-based ASCII art comparison using Canvas API
-          const geminiScore = await service.compareAsciiArtImage(
-            currentSubRound.targetPhrase, // This is the image URL
-            output
-          );
-          // Convert 0-100 to 0-5 scale
-          const normalizedScore = Math.round((geminiScore.score / 100) * 5);
+          // Round 2: ASCII art - No automatic scoring, store for manual review
           scoringResult = {
-            score: normalizedScore,
-            reasoning: geminiScore.reasoning,
-            exactMatch: normalizedScore === 5,
+            score: 0, // Will be scored manually
+            reasoning: 'Submitted for manual review',
+            exactMatch: false,
             keywordsMatched: [],
             keywordsTotal: [],
             fuzzyMatched: [],
@@ -584,15 +572,16 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
               <div className="text-xs text-white/40 uppercase font-bold mb-2 flex items-center gap-2">
                 <Target size={14} /> Target ASCII Art
               </div>
-              <div className="flex justify-center">
-                <img 
-                  src={currentSubRound.targetPhrase} 
-                  alt="ASCII Art Target" 
-                  className="max-w-full max-h-96 rounded border border-white/10"
-                />
+              <div className="bg-black/60 p-6 rounded-lg border border-white/5">
+                <p className="text-white/60 text-center text-sm">
+                  🖼️ ASCII Art Image Reference Available
+                </p>
+                <p className="text-white/40 text-center text-xs mt-2">
+                  (Image hidden to prevent copying)
+                </p>
               </div>
               <p className="text-center text-white/40 text-xs mt-2">
-                Make the AI generate ASCII art that matches this image
+                Make the AI generate ASCII art matching the target theme
               </p>
             </>
           ) : round.type === 'html-upload' ? (

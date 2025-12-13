@@ -141,19 +141,40 @@ const App: React.FC = () => {
         
         await leaderboardService.saveRound1Data(sessionId, subRoundsData, result.score, roundTime);
       } else if (result.roundId === 2 && result.subRoundResults) {
-        // Round 2: Image-based ASCII art with sub-rounds
+        // Round 2: Submit all attempts for manual review
+        if (user) {
+          for (const sr of result.subRoundResults) {
+            // Submit all attempts for this sub-round
+            if (sr.attempts) {
+              for (const attempt of sr.attempts) {
+                await leaderboardService.submitForManualReview(
+                  sessionId,
+                  user.username,
+                  2,
+                  sr.subRoundId,
+                  attempt.userPrompt,
+                  attempt.generatedContent,
+                  ROUNDS[1].subRounds?.find(s => s.id === sr.subRoundId)?.targetPhrase || '',
+                  attempt.attemptNumber
+                );
+              }
+            }
+          }
+        }
+        
+        // Save basic round data (score will be 0 until manually reviewed)
         const subRoundsData: SubRoundData[] = result.subRoundResults.map((sr, idx) => ({
           subRoundId: sr.subRoundId,
           targetPhrase: ROUNDS[1].subRounds?.[idx]?.targetPhrase || '',
           prompt: sr.userPrompt,
           output: sr.generatedContent,
-          score: sr.score,
+          score: 0, // Manual scoring
           timeTaken: Math.round(roundTime / result.subRoundResults!.length),
           attempts: sr.attempts?.map(a => ({
             attemptNumber: a.attemptNumber,
             prompt: a.userPrompt,
             output: a.generatedContent,
-            score: a.score,
+            score: 0, // Manual scoring
             flagged: a.flagged,
             flagReason: a.flagReason,
             keywordsMatched: a.keywordsMatched,
@@ -164,17 +185,36 @@ const App: React.FC = () => {
         await leaderboardService.saveRound2Data(
           sessionId, 
           subRoundsData, 
-          result.score, 
+          0, // Score will be added manually
           roundTime, 
           gameState.totalScore
         );
       } else if (result.roundId === 3 && result.subRoundResults) {
-        // Round 3: HTML upload - upload to Supabase Storage
+        // Round 3: HTML upload - submit for manual review
         const htmlContent = result.subRoundResults[0]?.generatedContent || '';
+        let htmlFileUrl = '';
         
         // Upload HTML file to storage
         if (htmlContent && user) {
-          await leaderboardService.uploadHtmlFile(user.username, htmlContent, sessionId);
+          const url = await leaderboardService.uploadHtmlFile(user.username, htmlContent, sessionId);
+          htmlFileUrl = url || '';
+          
+          // Submit all attempts for manual review
+          if (result.subRoundResults[0].attempts) {
+            for (const attempt of result.subRoundResults[0].attempts) {
+              await leaderboardService.submitForManualReview(
+                sessionId,
+                user.username,
+                3,
+                result.subRoundResults[0].subRoundId,
+                attempt.userPrompt,
+                'HTML file uploaded',
+                ROUNDS[2].subRounds?.[0]?.targetPhrase || '',
+                attempt.attemptNumber,
+                htmlFileUrl
+              );
+            }
+          }
         }
         
         const subRoundsData: SubRoundData[] = result.subRoundResults.map((sr, idx) => ({
@@ -182,13 +222,13 @@ const App: React.FC = () => {
           targetPhrase: ROUNDS[2].subRounds?.[idx]?.targetPhrase || '',
           prompt: sr.userPrompt,
           output: 'HTML file uploaded', // Don't store full HTML in DB
-          score: sr.score,
+          score: 0, // Manual scoring
           timeTaken: roundTime,
           attempts: sr.attempts?.map(a => ({
             attemptNumber: a.attemptNumber,
             prompt: a.userPrompt,
             output: 'HTML file',
-            score: a.score,
+            score: 0, // Manual scoring
             flagged: a.flagged,
             flagReason: a.flagReason,
             keywordsMatched: a.keywordsMatched,
@@ -199,7 +239,7 @@ const App: React.FC = () => {
         await leaderboardService.saveRound3Data(
           sessionId, 
           subRoundsData, 
-          result.score, 
+          0, // Score will be added manually
           roundTime, 
           gameState.totalScore,
           totalGameTime
