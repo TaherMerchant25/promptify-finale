@@ -572,16 +572,15 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
               <div className="text-xs text-white/40 uppercase font-bold mb-2 flex items-center gap-2">
                 <Target size={14} /> Target ASCII Art
               </div>
-              <div className="bg-black/60 p-6 rounded-lg border border-white/5">
-                <p className="text-white/60 text-center text-sm">
-                  🖼️ ASCII Art Image Reference Available
-                </p>
-                <p className="text-white/40 text-center text-xs mt-2">
-                  (Image hidden to prevent copying)
-                </p>
+              <div className="flex justify-center">
+                <img 
+                  src={currentSubRound.targetPhrase} 
+                  alt="ASCII Art Target" 
+                  className="max-w-full max-h-96 rounded border border-white/10"
+                />
               </div>
               <p className="text-center text-white/40 text-xs mt-2">
-                Make the AI generate ASCII art matching the target theme
+                Make the AI generate ASCII art matching this image
               </p>
             </>
           ) : round.type === 'html-upload' ? (
