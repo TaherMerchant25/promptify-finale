@@ -140,34 +140,65 @@ const App: React.FC = () => {
         }));
         
         await leaderboardService.saveRound1Data(sessionId, subRoundsData, result.score, roundTime);
-      } else if (result.roundId === 2) {
-        const roundData: SupabaseRoundData[] = [{
-          prompt: result.userPrompt,
-          output: result.generatedContent,
-          score: result.score,
-          timeTaken: roundTime,
-          targetContent: ROUNDS[1].targetContent,
-        }];
+      } else if (result.roundId === 2 && result.subRoundResults) {
+        // Round 2: Image-based ASCII art with sub-rounds
+        const subRoundsData: SubRoundData[] = result.subRoundResults.map((sr, idx) => ({
+          subRoundId: sr.subRoundId,
+          targetPhrase: ROUNDS[1].subRounds?.[idx]?.targetPhrase || '',
+          prompt: sr.userPrompt,
+          output: sr.generatedContent,
+          score: sr.score,
+          timeTaken: Math.round(roundTime / result.subRoundResults!.length),
+          attempts: sr.attempts?.map(a => ({
+            attemptNumber: a.attemptNumber,
+            prompt: a.userPrompt,
+            output: a.generatedContent,
+            score: a.score,
+            flagged: a.flagged,
+            flagReason: a.flagReason,
+            keywordsMatched: a.keywordsMatched,
+          })),
+          bestAttemptIndex: sr.bestAttemptIndex,
+        }));
         
         await leaderboardService.saveRound2Data(
           sessionId, 
-          roundData, 
+          subRoundsData, 
           result.score, 
           roundTime, 
           gameState.totalScore
         );
-      } else if (result.roundId === 3) {
-        const roundData: SupabaseRoundData[] = [{
-          prompt: result.userPrompt,
-          output: result.generatedContent,
-          score: result.score,
+      } else if (result.roundId === 3 && result.subRoundResults) {
+        // Round 3: HTML upload - upload to Supabase Storage
+        const htmlContent = result.subRoundResults[0]?.generatedContent || '';
+        
+        // Upload HTML file to storage
+        if (htmlContent && user) {
+          await leaderboardService.uploadHtmlFile(user.username, htmlContent, sessionId);
+        }
+        
+        const subRoundsData: SubRoundData[] = result.subRoundResults.map((sr, idx) => ({
+          subRoundId: sr.subRoundId,
+          targetPhrase: ROUNDS[2].subRounds?.[idx]?.targetPhrase || '',
+          prompt: sr.userPrompt,
+          output: 'HTML file uploaded', // Don't store full HTML in DB
+          score: sr.score,
           timeTaken: roundTime,
-          targetContent: ROUNDS[2].targetContent,
-        }];
+          attempts: sr.attempts?.map(a => ({
+            attemptNumber: a.attemptNumber,
+            prompt: a.userPrompt,
+            output: 'HTML file',
+            score: a.score,
+            flagged: a.flagged,
+            flagReason: a.flagReason,
+            keywordsMatched: a.keywordsMatched,
+          })),
+          bestAttemptIndex: sr.bestAttemptIndex,
+        }));
         
         await leaderboardService.saveRound3Data(
           sessionId, 
-          roundData, 
+          subRoundsData, 
           result.score, 
           roundTime, 
           gameState.totalScore,

@@ -114,16 +114,26 @@ export const leaderboardService = {
     totalScore: number,
     totalTime: number
   ): Promise<boolean> {
+    // Get current session data to calculate cumulative score
+    const { data: currentSession } = await supabase
+      .from('game_sessions')
+      .select('total_score, round2_score, round3_score')
+      .eq('id', sessionId)
+      .single();
+
+    const cumulativeScore = totalScore + (currentSession?.round2_score || 0) + (currentSession?.round3_score || 0);
+
     const { error } = await supabase
       .from('game_sessions')
       .update({
         round1_data: subRoundsData,
         round1_score: totalScore,
         round1_time: totalTime,
-        total_score: totalScore,
+        total_score: cumulativeScore,
         rounds_completed: 1,
         current_round: 2,
         status: 'Round 2',
+        updated_at: new Date().toISOString(),
       })
       .eq('id', sessionId);
 
@@ -137,7 +147,7 @@ export const leaderboardService = {
   // Save Round 2 data
   async saveRound2Data(
     sessionId: string,
-    roundData: RoundData[],
+    roundData: SubRoundData[],
     roundScore: number,
     roundTime: number,
     previousTotalScore: number
@@ -153,6 +163,7 @@ export const leaderboardService = {
         rounds_completed: 2,
         current_round: 3,
         status: 'Round 3',
+        updated_at: new Date().toISOString(),
       })
       .eq('id', sessionId);
 
@@ -166,7 +177,7 @@ export const leaderboardService = {
   // Save Round 3 data and mark as finished
   async saveRound3Data(
     sessionId: string,
-    roundData: RoundData[],
+    roundData: SubRoundData[],
     roundScore: number,
     roundTime: number,
     previousTotalScore: number,
@@ -184,6 +195,7 @@ export const leaderboardService = {
         rounds_completed: 3,
         current_round: 3,
         status: 'Finished',
+        updated_at: new Date().toISOString(),
       })
       .eq('id', sessionId);
 
@@ -266,5 +278,35 @@ export const leaderboardService = {
       return [];
     }
     return data || [];
+  },
+
+  // Upload HTML file to Supabase Storage
+  async uploadHtmlFile(playerName: string, htmlContent: string, sessionId: string): Promise<string | null> {
+    try {
+      const fileName = `${playerName}_${sessionId}_${Date.now()}.html`;
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      
+      const { data, error } = await supabase.storage
+        .from('html-submissions')
+        .upload(fileName, blob, {
+          contentType: 'text/html',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Error uploading HTML file:', error);
+        return null;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('html-submissions')
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (err) {
+      console.error('Error in uploadHtmlFile:', err);
+      return null;
+    }
   },
 };

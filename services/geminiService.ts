@@ -216,4 +216,108 @@ export class GeminiService {
     const json = JSON.parse(resp.text || "{}");
     return { score: json.score || 0, reasoning: json.reasoning || "Failed to judge." };
   }
+
+  /** ASCII ART IMAGE COMPARISON using Canvas API */
+  async compareAsciiArtImage(
+    targetImageUrl: string,
+    generatedAsciiText: string
+  ): Promise<{ score: number; reasoning: string }> {
+    const judgeSchema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        score: { type: Type.NUMBER },
+        reasoning: { type: Type.STRING },
+      },
+      required: ["score", "reasoning"],
+    };
+
+    const targetImg = await fileToGenerativePart(targetImageUrl);
+
+    const prompt = `
+      You are judging an ASCII art generation challenge.
+      
+      The player was shown an ASCII art image (provided) and needed to prompt an AI to generate similar ASCII art in text form.
+      
+      The AI generated this ASCII art text:
+      """
+      ${generatedAsciiText}
+      """
+      
+      Compare the generated ASCII text art to the target image and score from 0-100:
+      - 100: Perfect match - the ASCII art perfectly recreates the image's structure and details
+      - 80-99: Excellent - captures all major elements and structure with minor differences
+      - 60-79: Good - recognizably similar with main features present
+      - 40-59: Fair - some similarity but missing key elements or structure
+      - 20-39: Poor - vaguely related but major differences
+      - 0-19: No match - completely different or not ASCII art
+      
+      Consider:
+      - Overall structure and composition
+      - Key visual elements and details
+      - Character usage and density
+      - Artistic style and technique
+      
+      Be strict but fair.
+    `;
+
+    const resp = await this.ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [targetImg, { text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: judgeSchema,
+      },
+    });
+
+    const json = JSON.parse(resp.text || "{}");
+    return { score: json.score || 0, reasoning: json.reasoning || "Failed to judge." };
+  }
+
+  /** HTML COMPARISON - For Round 3 website replication */
+  async compareHtml(
+    targetHtml: string,
+    generatedHtml: string
+  ): Promise<{ score: number; reasoning: string }> {
+    const judgeSchema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        score: { type: Type.NUMBER },
+        reasoning: { type: Type.STRING },
+      },
+      required: ["score", "reasoning"],
+    };
+
+    const prompt = `
+      You are judging an HTML website replication challenge.
+      
+      TARGET: The player needed to replicate the frontend of dtu.ac.in website.
+      
+      GENERATED HTML:
+      """
+      ${generatedHtml}
+      """
+      
+      Score from 0-100 based on these criteria:
+      - Structure (0-30): HTML semantic elements, proper nesting, organization
+      - Styling (0-30): CSS styling, layout, responsive design, colors
+      - Content (0-20): Text content, images, links present
+      - Animations (0-20): CSS animations, transitions, interactive elements
+      
+      Be strict but fair. This is testing their ability to replicate a professional website's frontend.
+      
+      Return a score from 0-100 and detailed reasoning.
+    `;
+
+    const resp = await this.ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: judgeSchema,
+      },
+    });
+
+    const json = JSON.parse(resp.text || "{}");
+    return { score: json.score || 0, reasoning: json.reasoning || "Failed to judge." };
+  }
 }

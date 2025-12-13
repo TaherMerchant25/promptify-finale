@@ -53,48 +53,33 @@ export const ROUNDS: RoundData[] = [
   {
     id: 2,
     title: "ASCII Art Master",
-    description: "Generate ASCII Art that matches the target. Make the AI create ASCII art with similar symbols and structure! (10-15 minutes)",
-    type: 'text',
-    targetContent: "", // Not used for sub-round based challenges
+    description: "Generate ASCII Art from images using Gemini's vision. Make the AI create ASCII art matching the target images! (10-15 minutes)",
+    type: 'image',
+    targetContent: "/ascii-art-hacker.jpg",
     subRounds: [
       {
         id: "2a",
-        targetPhrase: `
-   ___ _         _ 
-  / __| |_  _ __| |_____ _ _ 
- | (__| ' \\| '_ \\ / / -_) '_|
-  \\___|_||_| .__/_\\_\\___|_|  
-           |_|               
-        `
+        targetPhrase: "/ascii-art-hacker.jpg" // Level 1: Hacker image
       },
       {
         id: "2b",
-        targetPhrase: `
-    .---.
-   /     \\
-   \\.@-@./
-   /\`\\_/\`\\
-  //  _  \\\\
- | \\     )|_
-/\`\\_\`>  <_/ \\
-\\__/'---'\\__/
-        `
+        targetPhrase: "/images (1).png" // Level 2: Second image
       }
     ]
   },
   {
     id: 3,
-    title: "Pixel Perfect: The Coffee",
-    description: "Generate an image that matches this target visual description: A minimal latte art heart in a white ceramic cup on a wooden table, top-down view.",
-    type: 'image',
-    targetContent: "https://picsum.photos/id/425/512/512", // Coffee cup
-  },
-  {
-    id: 4,
-    title: "Cyberpunk City",
-    description: "Generate a futuristic cyberpunk city street at night with neon blue and pink lights, rain on pavement, and no people.",
-    type: 'image',
-    targetContent: "https://picsum.photos/id/203/512/512",
+    title: "Ditto My Buddy",
+    description: "Replicate the frontend of dtu.ac.in with a different theme. Upload your single HTML file with embedded CSS. Bonus points for animations! (30 points)",
+    type: 'html-upload',
+    targetContent: "https://dtu.ac.in",
+    displayTarget: "Create a website similar to DTU's homepage with your own creative theme",
+    subRounds: [
+      {
+        id: "3a",
+        targetPhrase: "Replicate the dtu.ac.in homepage frontend with HTML/CSS. Include structure, styling, and animations."
+      }
+    ]
   }
 ];
 

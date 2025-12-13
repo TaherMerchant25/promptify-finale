@@ -23,6 +23,7 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes for all sub-rounds
   const [isTimeUp, setIsTimeUp] = useState(false);
   const [showAttemptResult, setShowAttemptResult] = useState(false);
+  const [uploadedHtml, setUploadedHtml] = useState<string>('');
 
   const subRounds = round.subRounds || [];
   const currentSubRound = subRounds[currentSubRoundIndex];
@@ -74,38 +75,100 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
     return { attempt: allAttempts[bestIndex], index: bestIndex };
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const htmlContent = event.target?.result as string;
+      setUploadedHtml(htmlContent);
+    };
+    reader.readAsText(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim() || isGenerating || showAttemptResult) return;
+    
+    // For HTML upload, check if file is uploaded
+    if (round.type === 'html-upload' && !uploadedHtml.trim()) {
+      alert('Please upload an HTML file first!');
+      return;
+    }
+    
+    // For text/image rounds, check if prompt is entered
+    if (round.type !== 'html-upload' && !prompt.trim()) {
+      return;
+    }
+    
+    if (isGenerating || showAttemptResult) return;
 
     setIsGenerating(true);
 
     try {
-      // Generate content using Gemini
-      const output = await service.generateText(prompt);
-      
-      // Calculate score based on round type
+      let output = '';
       let scoringResult: ScoringResult;
-      if (round.title === "ASCII Art Master") {
-        // Use ASCII art scoring for Round 2
-        scoringResult = calculateAsciiScore(
-          currentSubRound.targetPhrase,
-          output,
-          prompt
+      
+      if (round.type === 'html-upload') {
+        // Round 3: HTML comparison
+        output = uploadedHtml;
+        const geminiScore = await service.compareHtml(
+          currentSubRound.targetPhrase, // Target description
+          uploadedHtml
         );
+        // Convert 0-100 to 0-5 scale
+        const normalizedScore = Math.round((geminiScore.score / 100) * 5);
+        scoringResult = {
+          score: normalizedScore,
+          reasoning: geminiScore.reasoning,
+          exactMatch: normalizedScore === 5,
+          keywordsMatched: [],
+          keywordsTotal: [],
+          fuzzyMatched: [],
+          flagged: false
+        };
       } else {
-        // Use regular text scoring for Round 1
-        scoringResult = calculateScore(
-          currentSubRound.targetPhrase,
-          output,
-          prompt
-        );
+        // Generate content using Gemini for text/image rounds
+        output = await service.generateText(prompt);
+        
+        if (round.type === 'image') {
+          // Round 2: Image-based ASCII art comparison using Canvas API
+          const geminiScore = await service.compareAsciiArtImage(
+            currentSubRound.targetPhrase, // This is the image URL
+            output
+          );
+          // Convert 0-100 to 0-5 scale
+          const normalizedScore = Math.round((geminiScore.score / 100) * 5);
+          scoringResult = {
+            score: normalizedScore,
+            reasoning: geminiScore.reasoning,
+            exactMatch: normalizedScore === 5,
+            keywordsMatched: [],
+            keywordsTotal: [],
+            fuzzyMatched: [],
+            flagged: false
+          };
+        } else if (round.title === "ASCII Art Master") {
+          // Old text-based ASCII art scoring (if still needed)
+          scoringResult = calculateAsciiScore(
+            currentSubRound.targetPhrase,
+            output,
+            prompt
+          );
+        } else {
+          // Round 1: Regular text scoring
+          scoringResult = calculateScore(
+            currentSubRound.targetPhrase,
+            output,
+            prompt
+          );
+        }
       }
 
       const attemptNumber = currentAttempts.length + 1;
       const result: AttemptResult = {
         attemptNumber,
-        userPrompt: prompt,
+        userPrompt: round.type === 'html-upload' ? 'HTML Upload' : prompt,
         generatedContent: output,
         score: scoringResult.score,
         reasoning: scoringResult.reasoning,
@@ -134,6 +197,7 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
     setCurrentResult(null);
     setShowAttemptResult(false);
     setPrompt('');
+    setUploadedHtml(''); // Reset HTML upload for Round 3
   };
 
   const handleSubmitBest = () => {
@@ -513,14 +577,43 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
           </div>
         )}
         
-        {/* Target Phrase */}
+        {/* Target Display */}
         <div className="bg-black/40 border border-white/[0.08] rounded-lg p-4">
-          <div className="text-xs text-white/40 uppercase font-bold mb-2 flex items-center gap-2">
-            <Target size={14} /> Target Phrase
-          </div>
-          <p className="text-2xl text-white font-bold text-center py-4">
-            "{currentSubRound.targetPhrase}"
-          </p>
+          {round.type === 'image' ? (
+            <>
+              <div className="text-xs text-white/40 uppercase font-bold mb-2 flex items-center gap-2">
+                <Target size={14} /> Target ASCII Art
+              </div>
+              <div className="flex justify-center">
+                <img 
+                  src={currentSubRound.targetPhrase} 
+                  alt="ASCII Art Target" 
+                  className="max-w-full max-h-96 rounded border border-white/10"
+                />
+              </div>
+              <p className="text-center text-white/40 text-xs mt-2">
+                Make the AI generate ASCII art that matches this image
+              </p>
+            </>
+          ) : round.type === 'html-upload' ? (
+            <>
+              <div className="text-xs text-white/40 uppercase font-bold mb-2 flex items-center gap-2">
+                <Target size={14} /> Challenge
+              </div>
+              <p className="text-xl text-white font-bold text-center py-4">
+                {currentSubRound.targetPhrase}
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="text-xs text-white/40 uppercase font-bold mb-2 flex items-center gap-2">
+                <Target size={14} /> Target Phrase
+              </div>
+              <p className="text-2xl text-white font-bold text-center py-4">
+                "{currentSubRound.targetPhrase}"
+              </p>
+            </>
+          )}
         </div>
 
         {/* Scoring Info */}
@@ -536,25 +629,78 @@ const SubRoundGame: React.FC<SubRoundGameProps> = ({ round, service, onComplete,
       {/* Input Area */}
       <div className="flex-1 p-6 flex flex-col justify-end">
         <form onSubmit={handleSubmit} className="relative">
-          <div className="text-white/40 text-sm font-medium mb-2">
-            Your Prompt (make the AI say the target phrase without using it directly)
-          </div>
-          <div className="relative group">
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              disabled={isGenerating}
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 pr-16 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all h-32 resize-none font-mono text-sm placeholder-white/20 disabled:opacity-50"
-              placeholder="Write a creative prompt to make the AI output the target phrase..."
-            />
-            <button
-              type="submit"
-              disabled={!prompt.trim() || isGenerating}
-              className="absolute bottom-4 right-4 bg-gradient-to-r from-indigo-500 to-rose-500 hover:from-indigo-400 hover:to-rose-400 text-white p-2 rounded-lg disabled:opacity-0 disabled:pointer-events-none transition-all duration-300 shadow-lg shadow-indigo-500/25"
-            >
-              <Send size={18} />
-            </button>
-          </div>
+          {round.type === 'html-upload' ? (
+            <>
+              <div className="text-white/40 text-sm font-medium mb-2">
+                Upload Your HTML File
+              </div>
+              <div className="relative group">
+                <div className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl p-8 text-center">
+                  <input
+                    type="file"
+                    accept=".html"
+                    onChange={handleFileUpload}
+                    disabled={isGenerating}
+                    className="hidden"
+                    id="html-upload"
+                  />
+                  <label 
+                    htmlFor="html-upload" 
+                    className="cursor-pointer flex flex-col items-center gap-4"
+                  >
+                    <div className="bg-indigo-500/10 p-4 rounded-full">
+                      <svg className="w-12 h-12 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                    <div className="text-white">
+                      {uploadedHtml ? (
+                        <span className="text-green-400 font-semibold">✓ HTML File Uploaded ({uploadedHtml.length} characters)</span>
+                      ) : (
+                        <span className="text-white/60">Click to upload HTML file</span>
+                      )}
+                    </div>
+                    <div className="text-white/40 text-xs">
+                      Upload your HTML replication of dtu.ac.in
+                    </div>
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!uploadedHtml.trim() || isGenerating}
+                  className="mt-4 w-full bg-gradient-to-r from-indigo-500 to-rose-500 hover:from-indigo-400 hover:to-rose-400 text-white py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-indigo-500/25 font-bold flex items-center justify-center gap-2"
+                >
+                  <Send size={18} /> Submit HTML
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-white/40 text-sm font-medium mb-2">
+                {round.type === 'image' 
+                  ? 'Your Prompt (make the AI generate ASCII art matching the image)' 
+                  : 'Your Prompt (make the AI say the target phrase without using it directly)'}
+              </div>
+              <div className="relative group">
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  disabled={isGenerating}
+                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 pr-16 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all h-32 resize-none font-mono text-sm placeholder-white/20 disabled:opacity-50"
+                  placeholder={round.type === 'image' 
+                    ? "Write a prompt to make the AI generate ASCII art..." 
+                    : "Write a creative prompt to make the AI output the target phrase..."}
+                />
+                <button
+                  type="submit"
+                  disabled={!prompt.trim() || isGenerating}
+                  className="absolute bottom-4 right-4 bg-gradient-to-r from-indigo-500 to-rose-500 hover:from-indigo-400 hover:to-rose-400 text-white p-2 rounded-lg disabled:opacity-0 disabled:pointer-events-none transition-all duration-300 shadow-lg shadow-indigo-500/25"
+                >
+                  <Send size={18} />
+                </button>
+              </div>
+            </>
+          )}
         </form>
       </div>
 

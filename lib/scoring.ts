@@ -87,6 +87,26 @@ export function containsExactPhrase(targetPhrase: string, generatedText: string)
 }
 
 /**
+ * Check if prompt contains ordered subset of target phrase words
+ */
+function containsOrderedSubset(prompt: string, target: string): boolean {
+  const promptWords = normalizeText(prompt).split(/\s+/);
+  const targetWords = normalizeText(target).split(/\s+/);
+  
+  // Check if target words appear in order in the prompt
+  let targetIndex = 0;
+  for (const promptWord of promptWords) {
+    if (targetIndex < targetWords.length && promptWord === targetWords[targetIndex]) {
+      targetIndex++;
+    }
+  }
+  
+  // If we found 50% or more of target words in order, flag it
+  const orderedMatchRatio = targetIndex / targetWords.length;
+  return orderedMatchRatio >= 0.5;
+}
+
+/**
  * Check if the user's prompt is the exact target phrase (cheating detection)
  */
 export function isExactPrompt(userPrompt: string, targetPhrase: string): boolean {
@@ -98,6 +118,9 @@ export function isExactPrompt(userPrompt: string, targetPhrase: string): boolean
   
   // Check if prompt contains the exact phrase
   if (normalizedPrompt.includes(normalizedTarget)) return true;
+  
+  // Check for ordered subset (e.g., "the cage is" from "the cage is out of the lion")
+  if (containsOrderedSubset(userPrompt, targetPhrase)) return true;
   
   // Check for very high similarity (user trying to sneak in the phrase)
   const similarity = fuzzySimilarity(normalizedPrompt, normalizedTarget);

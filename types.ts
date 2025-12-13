@@ -4,7 +4,7 @@ export interface User {
   avatarUrl: string;
 }
 
-export type RoundType = 'text' | 'image';
+export type RoundType = 'text' | 'image' | 'html-upload';
 
 export interface SubRound {
   id: string;
